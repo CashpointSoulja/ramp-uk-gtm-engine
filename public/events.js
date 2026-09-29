@@ -28,6 +28,11 @@ export const EVENTS = {
     description: "The account objected to marketing. It is suppressed from every lane.",
     props: { accountId: "string", tierBefore: "string", hadWeek: "boolean" },
   },
+  duplicate_detected: {
+    source: "engine",
+    description: "A new or incoming record matched an existing company. It was merged into the primary record, with no second owner.",
+    props: { accountId: "string", duplicateOf: "string", matchedOn: "string", owner: "string|null" },
+  },
   lever_changed: {
     source: "engine",
     description: "A scoring or capacity lever moved.",
@@ -51,7 +56,7 @@ export const EVENTS = {
   touch_sent: {
     source: "downstream",
     description: "A sequence step was executed (from the sequencer or CRM).",
-    props: { accountId: "string", playId: "string", lane: "string", channel: "string", day: "number", week: "number" },
+    props: { accountId: "string", playId: "string", lane: "string", owner: "string", channel: "string", day: "number", week: "number", firstTouchBy: "string|null" },
   },
   meeting_booked: {
     source: "downstream",
@@ -71,11 +76,12 @@ export const EVENT_EXAMPLES = [
   { event: "account_opened", v: 1, ts: "2026-09-29T09:00:05.000Z", props: { accountId: "A12", rank: 1, tier: "P1", playId: "welcome_back" } },
   { event: "signal_logged", v: 1, ts: "2026-09-29T09:01:00.000Z", props: { accountId: "A21", signalType: "finance_leader_hired", ageDays: 0, rankBefore: 28, rankAfter: 11, tierBefore: "Nurture", tierAfter: "P2", playAfter: "new_finance_leader" } },
   { event: "opt_out_recorded", v: 1, ts: "2026-09-29T09:02:00.000Z", props: { accountId: "A10", tierBefore: "P2", hadWeek: true } },
+  { event: "duplicate_detected", v: 1, ts: "2026-09-29T09:02:30.000Z", props: { accountId: "U2", duplicateOf: "A12", matchedOn: "normalised name", owner: "AE 1" } },
   { event: "lever_changed", v: 1, ts: "2026-09-29T09:03:00.000Z", props: { lever: "aes", from: 2, to: 1 } },
   { event: "play_toggled", v: 1, ts: "2026-09-29T09:04:00.000Z", props: { playId: "welcome_back", enabled: false, accountsOnPlay: 0 } },
   { event: "draft_copied", v: 1, ts: "2026-09-29T09:05:00.000Z", props: { accountId: "A12", playId: "welcome_back" } },
   { event: "account_added", v: 1, ts: "2026-09-29T09:06:00.000Z", props: { accountId: "U1", priority: 58, tier: "P2", playId: "renewal_displacement" } },
-  { event: "touch_sent", v: 1, ts: "2026-09-30T08:30:00.000Z", props: { accountId: "A01", playId: "renewal_displacement", lane: "sdr", channel: "Email", day: 0, week: 1 } },
+  { event: "touch_sent", v: 1, ts: "2026-09-30T08:30:00.000Z", props: { accountId: "A01", playId: "renewal_displacement", lane: "sdr", owner: "SDR 1", channel: "Email", day: 0, week: 1, firstTouchBy: "2026-09-30" } },
   { event: "meeting_booked", v: 1, ts: "2026-10-03T14:10:00.000Z", props: { accountId: "A01", playId: "renewal_displacement", lane: "sdr", week: 1, predictedPMeeting: 0.246 } },
   { event: "opportunity_created", v: 1, ts: "2026-10-10T11:00:00.000Z", props: { accountId: "A01", playId: "renewal_displacement", annualSpendGBP: 744000 } },
 ];
@@ -89,6 +95,9 @@ export const METRICS = [
   { id: "overflow_rate", numerator: "actionable accounts with no week in the horizon", denominator: "actionable accounts (P1–P3, passed gates, not suppressed)", grain: "plan", use: "Headcount planning." },
   { id: "suppression_rate", numerator: "accounts in the Suppressed tier", denominator: "accounts that pass the UK gates", grain: "plan", use: "Compliance guardrail: rising suppression shrinks the workable book." },
   { id: "opt_out_rate", numerator: "opt_out_recorded", denominator: "accounts with ≥1 Email or LinkedIn touch_sent", grain: "play × month", use: "Guardrail: a play with a high opt-out rate is paused." },
+  { id: "first_touch_sla_attainment", numerator: "assigned accounts whose first touch_sent is on or before firstTouchBy", denominator: "accounts assigned a week and owner in the plan (excludes duplicates, suppressed, blocked, nurture)", grain: "owner × tier × week", use: "Tests whether the SLA is realistic for the capacity levers." },
+  { id: "duplicate_rate", numerator: "records marked duplicate", denominator: "all records in the plan", grain: "plan", use: "Data-quality guardrail for CRM and enrichment." },
+  { id: "second_owner_incidents", numerator: "companies with touch_sent from more than one owner in 30 days", denominator: "companies with ≥1 touch_sent in 30 days", grain: "month", use: "Must be 0. Checks that the one-owner rule holds downstream." },
   { id: "signal_lift", numerator: "first_meeting_rate of touched accounts with signal type X", denominator: "first_meeting_rate of touched accounts without X", grain: "signal type × quarter", use: "Refits the signal weights." },
   { id: "time_to_first_touch", numerator: "median days from account entering P1/P2 to first touch_sent", denominator: "(median, n = accounts entering P1/P2)", grain: "lane × week", use: "Tests whether timing signals are acted on before they decay." },
 ];

@@ -23,7 +23,7 @@ Getting a weekly target-account list wrong costs the most in a launch market:
 ## 4. Goals and non-goals
 Goals (this slice):
 1. Rank a UK book by explainable fit and timing, with every point traceable.
-2. Enforce UK eligibility gates and PECR-style contact rules before any play is chosen.
+2. Enforce UK eligibility gates and PECR-style contact rules before any play is chosen, and one-owner rules before any lane is assigned.
 3. Choose a play, a motion lane and a permitted-channel sequence, and draft a first touch.
 4. Fit the plan to weekly capacity and name the bottleneck.
 5. Make every non-sourced number visible as a synthetic assumption, and define the events and metrics that would replace it.
@@ -44,10 +44,12 @@ Non-goals: CRM sync, real enrichment, sending messages, user accounts, saved pla
 | FR-9 | Weekly capacity fill, overflow, expected meetings, AE load, bottleneck | `plan()` |
 | FR-10 | User-supplied accounts validated, with specific errors | `validateAccount()` |
 | FR-11 | API: `/api/health`, `/api/meta`, `/api/events`, `POST /api/plan`, `POST /api/score` | `src/worker.ts` |
+| FR-13 | Ownership: de-duplicate before lane assignment. An existing owner wins. A duplicate never gets a second owner. Owner conflicts are flagged. An opt-out applies company-wide | `ownershipKey()`, `plan()` |
+| FR-14 | Each assigned account gets exactly one owner and a deterministic first-touch SLA (P1 1, P2 2, P3 3 business days) | `firstTouchSla()` |
 | FR-12 | UI events emitted in the documented taxonomy shape | `public/events.js` |
 
 ## 6. Success metrics (for a real pilot)
-Defined with numerators and denominators in [EVENT_TAXONOMY.md](EVENT_TAXONOMY.md#metrics). The primary metric is **first-meeting rate per play**. Guardrails are **opt-out rate** and **suppression rate**. Diagnostics are **calibration gap**, **lane utilisation** and **time to first touch**. There are no targets yet: the current rates are synthetic ([ASSUMPTIONS.md](ASSUMPTIONS.md)).
+Defined with numerators and denominators in [EVENT_TAXONOMY.md](EVENT_TAXONOMY.md#metrics). The primary metric is **first-meeting rate per play**. Guardrails are **opt-out rate**, **suppression rate** and **second-owner incidents** (must be 0). Diagnostics are **calibration gap**, **lane utilisation**, **first-touch SLA attainment**, **duplicate rate** and **time to first touch**. There are no targets yet: the current rates are synthetic ([ASSUMPTIONS.md](ASSUMPTIONS.md)).
 
 ## 7. Rollout (if piloted)
 1. Shadow mode for 2 weeks: generate the plan and compare it with what reps actually worked. Send nothing.

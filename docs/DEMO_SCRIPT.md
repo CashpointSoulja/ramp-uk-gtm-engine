@@ -1,4 +1,4 @@
-# Demo script (5 minutes)
+# Demo script (6 minutes)
 
 Audience: a UK GTM leader in their first quarter after launch.
 
@@ -22,10 +22,14 @@ Filter to **Blocked**. Vantage Freight EU fits well (84) but has no UK entity an
 - Open **Marlow Kitchens**. It's a sole trader, but email consent is recorded, so it keeps its self-serve play.
 - Open **Saltmarsh Outdoor** (#7, week 1) and click **Record opt-out**. It is suppressed immediately, leaves week 1, and expected meetings fall.
 
-## 5. A signal changes the plan (45s)
+## 5. One account, one owner (30s)
+- Open **Sparrowhawk Labs** (#5). AE 2 already owns it in CRM, so the engine keeps it with AE 2 rather than round-robining it. First touch is due Wed 30 Sep.
+- Click **+ Score a new account** and add "Orbital Ledger Ltd". It's flagged as a **Duplicate** of A12, stays with AE 1, and gets no second owner, week or draft.
+
+## 6. A signal changes the plan (45s)
 Filter to **Nurture** and open **Greyline Architects** (#28, timing 0). Log a **New finance leader** from today. It jumps to about #11, moves to P2 and picks up the *First 90 days* play with a new draft. This is what should happen when enrichment finds a new CFO.
 
-## 6. Capacity is the real constraint (90s)
+## 7. Capacity is the real constraint (90s)
 Open **Capacity**.
 - By default, AE and partner lanes are full in week 1 (red), and work spills into week 2.
 - The bottleneck says pipeline volume: 3.6 expected meetings against a target of 5.
@@ -33,8 +37,8 @@ Open **Capacity**.
 - Reset, then cut **first meetings per AE** to 1: AEs can't take the expected meetings, and it switches to *AE meeting capacity*.
 - Shorten the **half-life** to 15 days: stale signals lose weight, and Parallax Fintech (renewal-driven) moves into the top five.
 
-## 7. Play strategy (30s)
+## 8. Play strategy (30s)
 Open **Plays** and turn off **Welcome back**. Orbital Ledger falls back to *Renewal window switch*, while Northbank and Sparrowhawk move to *AI spend control*. The plan rebuilds. This makes it easy to test "what if we don't lead with X in the UK?"
 
-## 8. Close (15s)
+## 9. Close (15s)
 **Method** shows the full scoring method, the assumption register, a live event log of what you just did, and the API. The same engine runs behind `POST /api/plan`, so it could sit behind CRM enrichment and not just this UI.

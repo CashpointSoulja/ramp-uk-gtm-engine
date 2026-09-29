@@ -5,7 +5,7 @@ export const AS_OF = "2026-09-29";
 
 /** @typedef {{type: string, daysAgo?: number, inDays?: number, kind?: string, note: string}} Signal */
 /** @typedef {{optedOut?: boolean, optedOutOn?: string, emailConsent?: boolean, ctps?: boolean, doNotCall?: boolean}} Contact */
-/** @typedef {{id: string, name: string, city: string, sector: string, employees: number, stage: string, legalForm?: string, ukEntity: boolean, gbpShare: number, entities: number, incumbent: string, accounting: string, monthlySpendGBP: number, aiNative: boolean, contact?: Contact, signals: Signal[]}} Account */
+/** @typedef {{id: string, name: string, city: string, sector: string, employees: number, stage: string, legalForm?: string, ukEntity: boolean, gbpShare: number, entities: number, incumbent: string, accounting: string, monthlySpendGBP: number, aiNative: boolean, contact?: Contact, companyNumber?: string, domain?: string, existingOwner?: {name: string, since?: string}, signals: Signal[]}} Account */
 
 /** @type {Account[]} */
 
@@ -185,6 +185,7 @@ export const ACCOUNTS = [
   {
     id: "A24", name: "Sparrowhawk Labs", city: "London", sector: "AI applications", employees: 32, stage: "Seed", legalForm: "Ltd",
     ukEntity: true, gbpShare: 0.5, entities: 2, incumbent: "Revolut Business", accounting: "Xero", monthlySpendGBP: 42000, aiNative: true,
+    existingOwner: { name: "AE 2", since: "2026-09-16" },
     signals: [
       { type: "us_ramp_alumni", kind: "entity", note: "Founders ran their earlier US entity on Ramp" },
       { type: "ai_spend_growth", daysAgo: 6, note: "Token spend now larger than payroll for contractors" },

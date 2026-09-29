@@ -1,6 +1,6 @@
 # Acceptance cases
 
-Each case is an automated test in `test/acceptance.test.ts`, and each test name starts with its ID. Run them with `npm test`.
+Cases AC-01 to AC-25. Each case is an automated test in `test/acceptance.test.ts`, and each test name starts with its ID. Run them with `npm test`.
 
 | ID | Given | Then |
 |---|---|---|
@@ -19,6 +19,15 @@ Each case is an automated test in `test/acceptance.test.ts`, and each test name 
 | AC-13 | *Welcome back* turned off | No account is on it. Orbital Ledger moves to *Renewal window switch* and Northbank to *AI spend control* |
 | AC-14 | Harrow & Finch on Sage 50 | The fit is flagged, and the draft doesn't promise a sync |
 | AC-15 | A malformed user account | Rejected, with a specific message for each field |
+| AC-17 | "Orbital Ledger Ltd" is added while Orbital Ledger (A12) is owned by AE 1 | `Duplicate` of A12, owned by AE 1: no second owner, week, SLA, sequence or draft. Week 1 is unchanged |
+| AC-18 | Records with the same Companies House number, domain or normalised name | Matched in that order of precedence |
+| AC-19 | Sparrowhawk Labs is owned by AE 2 in CRM | Keeps AE 2 under every lever setting and is never round-robined |
+| AC-20 | A lower-priority duplicate carries an existing owner | That record becomes primary, and the higher-priority copy is the duplicate |
+| AC-21 | Two duplicates name different owners | The earliest claim keeps it, and `conflicts[]` flags it for RevOps |
+| AC-22 | Duplicates plus owners across several capacity settings | Every company has at most one assigned record and one owner |
+| AC-23 | An opt-out is on a duplicate record | Every record of the company is suppressed |
+| AC-24 | Default plan | Every assigned account has one owner and an SLA (a P1 in week 1 is due 30 Sep, a P2 1 Oct). Unassigned accounts have no SLA |
+| AC-25 | Malformed `companyNumber`, `domain` or `existingOwner` | Rejected with specific messages |
 | AC-16 | The assumption register | Meeting rates, opportunity rate, capacity, signal weights, half-life and the timing multiplier are each labelled synthetic or a policy choice |
 
 API and event behaviour is covered in `test/worker.test.ts` (validation, 400s, 404s, `/api/events`, contact rules over the API) and `test/events.test.ts` (every example payload validates, and bad payloads are rejected).

@@ -1,7 +1,7 @@
 // Ramp UK GTM Engine: deterministic scoring, play selection, drafting and capacity planning.
 // Pure functions shared by the browser UI and the Worker API.
 
-import { SIGNAL_TYPES } from "./data.js";
+import { AS_OF, SIGNAL_TYPES } from "./data.js";
 
 export const DEFAULT_LEVERS = {
   fitWeight: 0.45,
@@ -63,6 +63,7 @@ export const ASSUMPTIONS = [
   { id: "motion_thresholds", value: "AE at 200+ staff or £200k+/mo; self-serve under 30 staff and £15k/mo", kind: "synthetic", note: "Segment cut-offs to test, not policy." },
   { id: "gbp_threshold", value: "50% of spend in GBP", kind: "policy", note: "Ramp's UK site says 'primarily in GBP'. The exact cut-off is a policy choice." },
   { id: "tiers", value: "P1 ≥ 60, P2 ≥ 50, nurture if timing < 15", kind: "synthetic", note: "Tier cut-offs." },
+  { id: "first_touch_sla", value: "P1 1 business day, P2 2, P3 3, from the start of the assigned week", kind: "policy", note: "First-touch SLA per owner. A policy choice to test, not a measured response-time benchmark." },
   { id: "accounts", value: "30 fictional UK companies", kind: "synthetic", note: "Every company, signal, legal form and contact flag in the demo book is invented." },
 ];
 
@@ -131,6 +132,56 @@ export function permittedSteps(steps, rules) {
 }
 
 export const OPT_OUT_LINE = "Not relevant? Reply \"unsubscribe\" and we won't contact you again.";
+
+// ---------- Ownership: duplicates, existing owners, first-touch SLA ----------
+
+export const OWNERSHIP_RULES = [
+  { id: "one_owner", rule: "One company, one owner.", reason: "Two reps on one company means double outreach, a worse first impression, and a doubled opt-out risk." },
+  { id: "dedupe_first", rule: "Records are matched on Companies House number, then web domain, then normalised name, before any lane is assigned.", reason: "Duplicates must be caught before round-robin, or each copy picks up its own owner." },
+  { id: "existing_owner_wins", rule: "An existing CRM owner always keeps the account. The engine never re-assigns it round-robin.", reason: "Ownership is a commitment to a rep and to the customer. Moving it needs a human decision." },
+  { id: "earliest_claim", rule: "If duplicate records name different owners, the earliest claim keeps it and the conflict is flagged for RevOps.", reason: "It's deterministic and doesn't reward whoever edited the record last." },
+  { id: "duplicate_no_owner", rule: "A duplicate record never gets its own owner, week, sequence or draft. It points to the primary record and its owner.", reason: "The work happens once, on the primary record." },
+  { id: "opt_out_company_wide", rule: "An opt-out on any record suppresses every record of that company.", reason: "An objection applies to the company, not to one copy of it in the CRM." },
+  { id: "first_touch_sla", rule: "The owner makes first touch within P1 1, P2 2 or P3 3 business days of the start of the assigned week.", reason: "Timing signals decay. The SLA makes 'why now' mean now. The day counts are a policy choice." },
+];
+
+export const SLA_BUSINESS_DAYS = { P1: 1, P2: 2, P3: 3 };
+
+const NAME_NOISE = /\b(ltd|limited|plc|llp|lp|uk|group|holdings|the|co|company)\b/g;
+
+/** @param {import("./data.js").Account} a */
+export function ownershipKey(a) {
+  if (a.companyNumber) return { key: `ch:${a.companyNumber.toUpperCase()}`, via: "Companies House number" };
+  if (a.domain) return { key: `web:${a.domain.toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, "")}`, via: "web domain" };
+  const n = a.name.toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9 ]/g, " ").replace(NAME_NOISE, " ").replace(/\s+/g, " ").trim();
+  return { key: `name:${n}`, via: "normalised name" };
+}
+
+/** @param {string} iso @param {number} days */
+function addDays(iso, days) {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/** @param {string} iso @param {number} n */
+export function addBusinessDays(iso, n) {
+  let d = iso;
+  let left = n;
+  while (left > 0) {
+    d = addDays(d, 1);
+    const wd = new Date(`${d}T00:00:00Z`).getUTCDay();
+    if (wd !== 0 && wd !== 6) left--;
+  }
+  return d;
+}
+
+/** @param {number} week @param {string} tier @param {string} owner */
+export function firstTouchSla(week, tier, owner, asOf = AS_OF) {
+  const days = SLA_BUSINESS_DAYS[tier] ?? 3;
+  const start = addDays(asOf, 7 * (week - 1));
+  return { owner, tier, weekStart: start, businessDays: days, firstTouchBy: addBusinessDays(start, days) };
+}
 
 // ---------- Fit ----------
 
@@ -417,9 +468,42 @@ export function scoreAccount(a, leversIn = {}) {
  */
 export function plan(accounts, leversIn = {}) {
   const lv = normaliseLevers(leversIn);
-  /** @type {(ReturnType<typeof scoreAccount> & {rank: number, assignment?: {week: number | null, owner: string}})[]} */
-  const scored = accounts.map((a) => ({ ...scoreAccount(a, lv), rank: 0 })).sort((x, y) => y.priority - x.priority || x.id.localeCompare(y.id));
+
+  /** @type {Map<string, import("./data.js").Account[]>} */
+  const groups = new Map();
+  for (const a of accounts) {
+    const k = ownershipKey(a).key;
+    groups.set(k, [...(groups.get(k) ?? []), a]);
+  }
+  const prepared = accounts.map((a) => {
+    const optedOut = (groups.get(ownershipKey(a).key) ?? []).find((m) => m.contact?.optedOut);
+    return optedOut && !a.contact?.optedOut ? { ...a, contact: { ...(a.contact ?? {}), optedOut: true, optedOutOn: optedOut.contact?.optedOutOn } } : a;
+  });
+
+  /** @typedef {{key: string, matchedOn: string, status: "unowned" | "round_robin" | "existing_owner" | "duplicate", owner: string | null, duplicateOf: string | null, conflict: string | null, reason: string}} Ownership */
+  /** @type {(ReturnType<typeof scoreAccount> & {rank: number, assignment?: {week: number | null, owner: string}, ownership: Ownership, sla: ReturnType<typeof firstTouchSla> | null})[]} */
+  const scored = prepared
+    .map((a) => {
+      const k = ownershipKey(a);
+      return { ...scoreAccount(a, lv), rank: 0, sla: null, ownership: { key: k.key, matchedOn: k.via, status: /** @type {Ownership["status"]} */ ("unowned"), owner: null, duplicateOf: null, conflict: null, reason: "" } };
+    })
+    .sort((x, y) => y.priority - x.priority || x.id.localeCompare(y.id));
   scored.forEach((s, i) => (s.rank = i + 1));
+
+  /** @type {Map<string, typeof scored[number]>} */
+  const primaryOf = new Map();
+  for (const [key, members] of groups) {
+    if (members.length === 0) continue;
+    const rows = scored.filter((s) => s.ownership.key === key);
+    const claims = rows
+      .filter((r) => r.account.existingOwner)
+      .sort((x, y) => (x.account.existingOwner?.since ?? "").localeCompare(y.account.existingOwner?.since ?? "") || x.id.localeCompare(y.id));
+    const primary = claims[0] ?? rows[0];
+    primaryOf.set(key, primary);
+    const owners = [...new Set(claims.map((c) => c.account.existingOwner?.name))];
+    if (owners.length > 1)
+      primary.ownership.conflict = `Records name different owners (${claims.map((c) => `${c.account.existingOwner?.name} on ${c.id} since ${c.account.existingOwner?.since}`).join("; ")}). The earliest claim keeps it. RevOps should merge the records.`;
+  }
 
   const weeks = Array.from({ length: lv.weeks }, (_, i) => ({
     week: i + 1,
@@ -438,26 +522,71 @@ export function plan(accounts, leversIn = {}) {
   const headcount = { sdr: lv.sdrs, ae: lv.aes, partner: 1 };
 
   for (const s of scored) {
+    const primary = primaryOf.get(s.ownership.key);
+    if (primary && primary.id !== s.id) {
+      s.ownership.status = "duplicate";
+      s.ownership.duplicateOf = primary.id;
+      s.tier = "Duplicate";
+      s.play = null;
+      s.playName = null;
+      s.pMeeting = 0;
+      s.sequence = [];
+      s.draft = null;
+      s.draftNote = null;
+      continue;
+    }
+    const existing = s.account.existingOwner;
+    if (existing) {
+      s.ownership.status = "existing_owner";
+      s.ownership.owner = existing.name;
+    }
     if (s.tier === "Blocked" || s.tier === "Nurture" || s.tier === "Suppressed") continue;
     const lane = s.motion.lane;
     if (lane === "digital") {
       weeks[0].used.digital++;
       weeks[0].accounts.push(s.id);
-      s.assignment = { week: 1, owner: "Lifecycle email" };
-      continue;
+      s.assignment = { week: 1, owner: existing?.name ?? "Lifecycle email" };
+    } else {
+      const wk = weeks.find((w) => w.used[lane] < w.cap[lane]);
+      if (!wk) {
+        overflow.push(s.id);
+        s.assignment = { week: null, owner: existing?.name ?? "Overflow" };
+        continue;
+      }
+      wk.used[lane]++;
+      wk.accounts.push(s.id);
+      wk.expectedMeetings += s.pMeeting;
+      if (existing) s.assignment = { week: wk.week, owner: existing.name };
+      else {
+        const idx = (rr[lane]++ % Math.max(headcount[lane], 1)) + 1;
+        s.assignment = { week: wk.week, owner: lane === "partner" ? "Partner manager" : `${lane.toUpperCase()} ${idx}` };
+      }
     }
-    const wk = weeks.find((w) => w.used[lane] < w.cap[lane]);
-    if (!wk) {
-      overflow.push(s.id);
-      s.assignment = { week: null, owner: "Overflow" };
-      continue;
+    if (!existing) {
+      s.ownership.status = "round_robin";
+      s.ownership.owner = s.assignment.owner;
     }
-    wk.used[lane]++;
-    wk.accounts.push(s.id);
-    wk.expectedMeetings += s.pMeeting;
-    const n = headcount[lane];
-    const idx = (rr[lane]++ % Math.max(n, 1)) + 1;
-    s.assignment = { week: wk.week, owner: lane === "partner" ? "Partner manager" : `${lane.toUpperCase()} ${idx}` };
+    const week = s.assignment.week;
+    if (week) s.sla = firstTouchSla(week, s.tier, s.assignment.owner);
+  }
+
+  for (const s of scored) {
+    const o = s.ownership;
+    if (o.status === "duplicate") {
+      const p = scored.find((x) => x.id === o.duplicateOf);
+      o.owner = p?.ownership.owner ?? null;
+      o.reason = `Same company as ${p?.account.name} (${p?.id}), matched on ${o.matchedOn}. That record ${o.owner ? `is owned by ${o.owner}` : "has no owner yet"}. No second owner, week or sequence is assigned here. Log activity on ${p?.id}.`;
+    } else if (o.status === "existing_owner") {
+      const since = s.account.existingOwner?.since;
+      o.reason = `Owned by ${o.owner} in CRM${since ? ` since ${since}` : ""}. Existing ownership takes precedence, so no round-robin owner is assigned.${s.assignment && !s.assignment.week ? " No capacity in the horizon, but it stays with its owner." : ""}`;
+    } else if (o.status === "round_robin") {
+      o.reason = s.assignment?.week
+        ? `No existing owner and no duplicate found. Assigned to ${o.owner} for week ${s.assignment.week} in priority order.`
+        : `No existing owner and no duplicate found, but no ${s.motion.label} capacity in the horizon. Not assigned yet.`;
+      if (!s.assignment?.week) o.owner = null;
+    } else {
+      o.reason = s.tier === "Suppressed" ? "Suppressed, so it is not assigned to anyone." : s.tier === "Blocked" ? "Held at the UK gate, so it is not assigned." : "Nurture, so it is not assigned yet.";
+    }
   }
 
   const byId = Object.fromEntries(scored.map((s) => [s.id, s]));
@@ -481,7 +610,7 @@ export function plan(accounts, leversIn = {}) {
   const playMix = {};
   for (const s of scored) if (s.play) playMix[s.play] = (playMix[s.play] ?? 0) + 1;
 
-  const tiers = { P1: 0, P2: 0, P3: 0, Nurture: 0, Suppressed: 0, Blocked: 0 };
+  const tiers = { P1: 0, P2: 0, P3: 0, Nurture: 0, Suppressed: 0, Duplicate: 0, Blocked: 0 };
   for (const s of scored) tiers[s.tier]++;
 
   return {
@@ -489,6 +618,8 @@ export function plan(accounts, leversIn = {}) {
     ranked: scored,
     weeks,
     overflow,
+    duplicates: scored.filter((s) => s.ownership.status === "duplicate").map((s) => ({ id: s.id, duplicateOf: s.ownership.duplicateOf, owner: s.ownership.owner })),
+    conflicts: scored.filter((s) => s.ownership.conflict).map((s) => ({ id: s.id, conflict: s.ownership.conflict })),
     bottleneck,
     playMix,
     tiers,
@@ -535,6 +666,19 @@ export function validateAccount(raw) {
     }
     if (typeof rc.optedOutOn === "string" && /^\d{4}-\d{2}-\d{2}$/.test(rc.optedOutOn)) contact.optedOutOn = rc.optedOutOn;
   }
+  const companyNumber = typeof raw.companyNumber === "string" && raw.companyNumber.trim() ? raw.companyNumber.trim().toUpperCase() : undefined;
+  if (companyNumber && !/^[A-Z0-9]{8}$/.test(companyNumber)) errs.push("companyNumber must be an 8-character Companies House number");
+  const domain = typeof raw.domain === "string" && raw.domain.trim() ? raw.domain.trim().toLowerCase().slice(0, 100) : undefined;
+  if (domain && !/^(https?:\/\/)?(www\.)?[a-z0-9-]+(\.[a-z0-9-]+)+(\/.*)?$/.test(domain)) errs.push("domain must look like example.co.uk");
+  /** @type {{name: string, since?: string} | undefined} */
+  let existingOwner;
+  if (raw.existingOwner !== undefined && raw.existingOwner !== null && raw.existingOwner !== "") {
+    const eo = raw.existingOwner;
+    const oname = typeof eo === "object" && typeof eo.name === "string" ? eo.name.trim().slice(0, 40) : "";
+    if (!oname) errs.push("existingOwner.name is required when existingOwner is set");
+    else if (eo.since !== undefined && !(typeof eo.since === "string" && /^\d{4}-\d{2}-\d{2}$/.test(eo.since))) errs.push("existingOwner.since must be YYYY-MM-DD");
+    else existingOwner = eo.since ? { name: oname, since: eo.since } : { name: oname };
+  }
   const signals = Array.isArray(raw.signals) ? raw.signals : [];
   if (signals.length > 12) errs.push("at most 12 signals");
   const clean = [];
@@ -565,6 +709,9 @@ export function validateAccount(raw) {
       monthlySpendGBP: spend,
       aiNative: raw.aiNative === true,
       contact,
+      ...(companyNumber ? { companyNumber } : {}),
+      ...(domain ? { domain } : {}),
+      ...(existingOwner ? { existingOwner } : {}),
       signals: clean,
     },
   };

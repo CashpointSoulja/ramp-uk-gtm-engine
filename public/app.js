@@ -1,5 +1,5 @@
 import { ACCOUNTS, AS_OF, SIGNAL_TYPES } from "./data.js";
-import { ASSUMPTIONS, DEFAULT_LEVERS, LEVER_LIMITS, PLAYS, PLAY_ORDER, plan, validateAccount } from "./engine.js";
+import { ASSUMPTIONS, OWNERSHIP_RULES, DEFAULT_LEVERS, LEVER_LIMITS, PLAYS, PLAY_ORDER, plan, validateAccount } from "./engine.js";
 import { makeEvent } from "./events.js";
 
 const $ = (sel) => document.querySelector(sel);
@@ -7,7 +7,7 @@ const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 const gbp = (n) => (n >= 1e6 ? `£${(n / 1e6).toFixed(1)}m` : n >= 1e3 ? `£${Math.round(n / 1e3)}k` : `£${Math.round(n)}`);
 const pct = (n) => `${Math.round(n * 100)}%`;
 const LANES = { sdr: "SDR", ae: "AE", partner: "Partner", digital: "Self-serve", hold: "Hold" };
-const TIERS = ["All", "P1", "P2", "P3", "Nurture", "Suppressed", "Blocked"];
+const TIERS = ["All", "P1", "P2", "P3", "Nurture", "Suppressed", "Duplicate", "Blocked"];
 
 const state = {
   levers: structuredClone(DEFAULT_LEVERS),
@@ -28,6 +28,10 @@ function accounts() {
     if (state.optOuts[a.id]) out = { ...out, contact: { ...(out.contact ?? {}), optedOut: true, optedOutOn: state.optOuts[a.id] } };
     return out;
   });
+}
+
+function fmtDate(iso) {
+  return new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
 }
 
 function emit(name, props) {
@@ -89,12 +93,12 @@ function renderList() {
   $("#acct-list").innerHTML = rows.length
     ? rows
         .map((s) => {
-          const who = s.assignment ? (s.assignment.week ? `Wk ${s.assignment.week} · ${s.assignment.owner}` : "Over capacity") : s.tier === "Blocked" ? "Held at gate" : s.tier === "Suppressed" ? "Do not contact" : "Nurture";
+          const who = s.assignment ? (s.assignment.week ? `Wk ${s.assignment.week} · ${s.assignment.owner}` : "Over capacity") : s.tier === "Blocked" ? "Held at gate" : s.tier === "Suppressed" ? "Do not contact" : s.tier === "Duplicate" ? `Duplicate of ${s.ownership.duplicateOf}` : "Nurture";
           return `<li><button class="acct ${s.id === state.selected ? "sel" : ""}" data-id="${esc(s.id)}" aria-current="${s.id === state.selected}">
             <span class="rank">${s.rank}</span>
             <span class="main"><span class="nm">${esc(s.account.name)}${s.account.id.startsWith("U") ? ' <em class="new">added</em>' : ""}</span>
               <span class="meta">${esc(s.account.city)} · ${esc(s.account.sector)} · ${s.account.employees} staff</span>
-              <span class="play">${s.playName ? esc(s.playName) : s.tier === "Blocked" ? "Blocked by UK gate" : s.tier === "Suppressed" ? "Suppressed: contact rules" : "No play yet"}</span></span>
+              <span class="play">${s.playName ? esc(s.playName) : s.tier === "Blocked" ? "Blocked by UK gate" : s.tier === "Suppressed" ? "Suppressed: contact rules" : s.tier === "Duplicate" ? `Merged into ${s.ownership.duplicateOf}` : "No play yet"}</span></span>
             <span class="side"><span class="tier t-${s.tier}">${s.tier}</span><span class="pri">${s.priority}</span><span class="who ${s.assignment && !s.assignment.week ? "over" : ""}">${esc(who)}</span></span>
           </button></li>`;
         })
@@ -134,9 +138,12 @@ function renderDetail() {
   const fitRows = s.fit.parts.map((p) => `<li><span>${esc(p.label)}</span><span class="fs"><i style="width:${p.score}%"></i></span><b>${p.score}</b></li>`).join("");
   const assign = s.assignment
     ? s.assignment.week
-      ? `<span class="pill">Week ${s.assignment.week}</span><span class="pill">${esc(s.assignment.owner)}</span>`
+      ? `<span class="pill">Week ${s.assignment.week}</span><span class="pill">${esc(s.assignment.owner)}</span>${s.sla ? `<span class="pill strong">First touch by ${esc(fmtDate(s.sla.firstTouchBy))}</span>` : ""}`
       : `<span class="pill over">Over capacity: add a rep or a week</span>`
     : "";
+  const o = s.ownership;
+  const ownerLabel = { duplicate: "Duplicate: no second owner", existing_owner: "Existing owner kept", round_robin: "Owner", unowned: "Not assigned" }[o.status];
+  const ownerBox = `<div class="callout ${o.status === "duplicate" || o.conflict ? "block" : o.status === "existing_owner" ? "flag" : "pass"}"><b>${esc(ownerLabel)}</b>${o.owner ? ` ${esc(o.owner)} ·` : ""} ${esc(o.reason)}${s.sla ? ` First touch due ${esc(fmtDate(s.sla.firstTouchBy))} (${s.sla.tier}: ${s.sla.businessDays} business day${s.sla.businessDays > 1 ? "s" : ""}).` : ""}${o.conflict ? `<ul><li>${esc(o.conflict)}</li></ul>` : ""}${o.status === "duplicate" ? ` <button class="ghost sm" type="button" data-open="${esc(o.duplicateOf)}">Open ${esc(o.duplicateOf)}</button>` : ""}</div>`;
   const play = s.play
     ? `<section class="card play-card">
         <div class="ph"><div><span class="lbl">Play</span><h3>${esc(s.playName)}</h3><p>${esc(PLAYS[s.play].summary)}</p></div>
@@ -154,7 +161,7 @@ function renderDetail() {
         ${s.draft ? `<pre class="draft" id="draft-text">${esc(s.draft)}</pre>
         <p class="fine">Built from the account's own signals, systems and current tool. Placeholders in brackets. The opt-out line is required, so don't remove it.</p>` : `<p class="fine">${esc(s.draftNote)}</p>`}
       </section>`
-    : `<section class="card"><span class="lbl">Play</span><p>${s.gates.length ? "No play until the gate clears." : s.tier === "Suppressed" ? "No play. Contact rules don't allow outreach from any lane." : "No play matches strongly enough yet. Log a signal below to see where it would land."}</p></section>`;
+    : `<section class="card"><span class="lbl">Play</span><p>${s.gates.length ? "No play until the gate clears." : s.tier === "Suppressed" ? "No play. Contact rules don't allow outreach from any lane." : s.tier === "Duplicate" ? "No play here. Work the primary record so the company has one owner and one sequence." : "No play matches strongly enough yet. Log a signal below to see where it would land."}</p></section>`;
 
   $("#detail").innerHTML = `
     <div class="dhead">
@@ -166,7 +173,7 @@ function renderDetail() {
         <p class="fine">Priority = ${Math.round(lv.fitWeight * 100)}% fit + ${100 - Math.round(lv.fitWeight * 100)}% timing</p>
       </div>
     </div>
-    ${gate}${contactBox}${flags}
+    ${gate}${contactBox}${ownerBox}${flags}
     <div class="grid2">
       <section class="card"><span class="lbl">Why now</span><ul class="why">${why}</ul>
         <form class="log" id="log-form"><span class="lbl">Log a new signal</span>
@@ -279,6 +286,7 @@ function renderMethod() {
     <section class="card"><h3>How an account is ranked</h3><ol class="steps">
       <li><b>UK gates.</b> Ramp UK serves UK-headquartered businesses that run mainly in GBP. An account without a UK entity, or with under half its spend in GBP, is held and gets no play.</li>
       <li><b>Contact rules (PECR).</b> Checked before any play. An opt-out suppresses the account everywhere. Sole traders and non-Scottish partnerships need specific consent before marketing email or LinkedIn messages. Numbers on the CTPS/TPS are not called. If no permitted channel is left for the motion, the account is suppressed. Every email draft carries an opt-out.</li>
+      <li><b>Ownership.</b> Before any lane is assigned, records are de-duplicated on Companies House number, then domain, then normalised name. An existing CRM owner always keeps the account. A duplicate never gets a second owner. Each assigned account gets one owner and a first-touch SLA.</li>
       <li><b>Fit (0–100).</b> Size 25%, accounting system 25%, monthly card and bill spend 25%, current tool 15%, entity count 10%. Xero and QuickBooks score highest because they have the strongest UK sync. NetSuite, Sage Intacct and Business Central are supported. Anything else is flagged for checking.</li>
       <li><b>Timing (0–100).</b> Each signal has a weight and loses strength with age, set by the half-life lever. Signals combine as 1 − ∏(1 − wᵢ), so two medium signals beat one weak one without going over 100. Renewals peak 30–150 days out.</li>
       <li><b>Priority</b> = fit weight × fit + (1 − fit weight) × timing. Accounts with timing under 15 go to nurture, whatever their fit.</li>
@@ -296,6 +304,7 @@ function renderMethod() {
         <li>Scoring is deterministic and explainable. The same inputs always give the same plan, and every point can be traced.</li>
       </ul></section>
     </div>
+    <section class="card"><h3>Ownership rules</h3><p class="fine">Applied before round-robin. Also served at /api/meta.</p><table class="tbl"><thead><tr><th>Rule</th><th>Why</th></tr></thead><tbody>${OWNERSHIP_RULES.map((x) => `<tr><td>${esc(x.rule)}</td><td>${esc(x.reason)}</td></tr>`).join("")}</tbody></table></section>
     <section class="card"><h3>Assumption register</h3><p class="fine">Every number not taken from a public source.</p><table class="tbl"><thead><tr><th>Assumption</th><th>Value</th><th>Type</th></tr></thead><tbody>${ASSUMPTIONS.map((x) => `<tr><td>${esc(x.note)}</td><td>${esc(x.value)}</td><td><span class="tag tag-${x.kind}">${x.kind === "synthetic" ? "Synthetic assumption" : "Policy choice"}</span></td></tr>`).join("")}</tbody></table></section>
     <section class="card"><h3>Event log (this session)</h3><p class="fine">Events emitted by the UI, in the shape documented in docs/EVENT_TAXONOMY.md. They stay in the browser. Newest first.</p>
 <pre class="code">${esc(state.events.slice(0, 8).map((e) => JSON.stringify(e)).join("\n"))}</pre></section>
@@ -454,6 +463,9 @@ $("#add-form").addEventListener("submit", (e) => {
     ukEntity: d.get("ukEntity") === "on",
     legalForm: d.get("legalForm"),
     contact: { optedOut: d.get("optedOut") === "on", emailConsent: d.get("emailConsent") === "on", ctps: d.get("ctps") === "on" },
+    domain: d.get("domain"),
+    companyNumber: d.get("companyNumber"),
+    existingOwner: String(d.get("existingOwner") ?? "").trim() ? { name: d.get("existingOwner"), since: "2026-09-29" } : undefined,
     signals: signal ? [signal] : [],
   });
   if (v.errors) { $("#add-err").textContent = v.errors.join(". "); return; }
@@ -462,7 +474,10 @@ $("#add-form").addEventListener("submit", (e) => {
   recompute("account_added");
   const s = byId(v.account.id);
   emit("account_added", { accountId: s.id, priority: s.priority, tier: s.tier, playId: s.play });
-  toast(`${s.account.name} scored ${s.priority} (${s.tier}) and ranks #${s.rank}`);
+  if (s.ownership.status === "duplicate") {
+    emit("duplicate_detected", { accountId: s.id, duplicateOf: s.ownership.duplicateOf, matchedOn: s.ownership.matchedOn, owner: s.ownership.owner });
+    toast(`${s.account.name} is a duplicate of ${s.ownership.duplicateOf}. It stays with ${s.ownership.owner ?? "that record"}, with no second owner.`);
+  } else toast(`${s.account.name} scored ${s.priority} (${s.tier}) and ranks #${s.rank}`);
   e.target.hidden = true;
   $("#add-toggle").setAttribute("aria-expanded", "false");
   openAccount(s.id);

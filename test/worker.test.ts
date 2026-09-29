@@ -74,4 +74,27 @@ describe("worker API", () => {
     const bad = await post("/api/score", { account: { name: "X", employees: 10, monthlySpendGBP: 1000, gbpShare: 1, accounting: "Xero", contact: { ctps: "no" } } });
     expect(bad.status).toBe(400);
   });
+
+  it("flags a scored account that duplicates the book instead of giving it an owner", async () => {
+    const r = await post("/api/score", { account: { name: "Orbital Ledger Limited", employees: 320, monthlySpendGBP: 240000, gbpShare: 0.76, accounting: "NetSuite", incumbent: "Spendesk", signals: [{ type: "funding_round", daysAgo: 3 }] } });
+    expect(r.status).toBe(200);
+    expect(await r.json()).toMatchObject({ tier: "Duplicate", ownership: { status: "duplicate", duplicateOf: "A12", owner: "AE 1" } });
+  });
+
+  it("keeps existing owners and returns SLAs and duplicates from /api/plan", async () => {
+    const r = await post("/api/plan", { extraAccounts: [{ name: "Sparrowhawk Labs Ltd", employees: 32, monthlySpendGBP: 42000, gbpShare: 0.5, accounting: "Xero", existingOwner: { name: "SDR 1", since: "2026-09-25" } }] });
+    const b = (await r.json()) as { duplicates: { id: string; owner: string }[]; conflicts: unknown[]; ranked: { id: string; sla: { firstTouchBy: string } | null; assignment?: { owner: string } }[] };
+    expect(b.duplicates).toEqual([{ id: "X01", duplicateOf: "A24", owner: "AE 2" }]);
+    expect(b.conflicts).toHaveLength(1);
+    expect(b.ranked.find((s) => s.id === "A24")?.assignment?.owner).toBe("AE 2");
+    expect(b.ranked.find((s) => s.id === "A12")?.sla?.firstTouchBy).toBe("2026-09-30");
+    const bad = await post("/api/plan", { extraAccounts: [{ name: "Z", employees: 5, monthlySpendGBP: 1000, gbpShare: 1, accounting: "Xero", existingOwner: { name: "" } }] });
+    expect(bad.status).toBe(400);
+  });
+
+  it("serves the ownership rules in meta", async () => {
+    const b = (await (await call("/api/meta")).json()) as { ownershipRules: { id: string }[]; firstTouchSlaBusinessDays: Record<string, number> };
+    expect(b.ownershipRules.map((x) => x.id)).toContain("existing_owner_wins");
+    expect(b.firstTouchSlaBusinessDays).toEqual({ P1: 1, P2: 2, P3: 3 });
+  });
 });

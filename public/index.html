@@ -57,6 +57,11 @@
               <label>GBP share of spend<input name="gbpShare" type="number" min="0" max="1" step="0.05" value="0.9" required /></label>
               <label>Entities<input name="entities" type="number" min="1" max="200" value="1" required /></label>
             </div>
+            <div class="row2">
+              <label>Web domain<input name="domain" maxlength="100" placeholder="harbourline.co.uk" /></label>
+              <label>Companies House no.<input name="companyNumber" maxlength="8" placeholder="optional" /></label>
+            </div>
+            <label>Existing CRM owner<input name="existingOwner" maxlength="40" placeholder="leave blank if unowned" /></label>
             <label>Legal form<select name="legalForm"><option>Ltd</option><option>PLC</option><option>LLP</option><option>Scottish partnership</option><option>Partnership</option><option>Sole trader</option></select></label>
             <label>Strongest signal<select name="signal" id="add-signal"></select></label>
             <label>Signal age / days until renewal<input name="signalDays" type="number" min="0" max="730" value="10" /></label>

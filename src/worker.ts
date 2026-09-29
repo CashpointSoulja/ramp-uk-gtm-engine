@@ -1,5 +1,5 @@
 import { ACCOUNTS, AS_OF, SIGNAL_TYPES } from "../public/data.js";
-import { ASSUMPTIONS, DEFAULT_LEVERS, LEGAL_FORMS, PLAYS, SOURCES, plan, scoreAccount, validateAccount } from "../public/engine.js";
+import { ASSUMPTIONS, DEFAULT_LEVERS, LEGAL_FORMS, OWNERSHIP_RULES, PLAYS, SLA_BUSINESS_DAYS, SOURCES, plan, validateAccount } from "../public/engine.js";
 import { EVENTS, EVENT_EXAMPLES, METRICS } from "../public/events.js";
 
 interface Env {
@@ -45,6 +45,8 @@ export default {
         defaultLevers: DEFAULT_LEVERS,
         legalForms: LEGAL_FORMS,
         assumptions: ASSUMPTIONS,
+        ownershipRules: OWNERSHIP_RULES,
+        firstTouchSlaBusinessDays: SLA_BUSINESS_DAYS,
         sources: SOURCES,
       });
 
@@ -72,7 +74,8 @@ export default {
       const v = validateAccount(b.account);
       if (!v.account) return json({ error: v.errors.join("; ") }, 400);
       const levers = typeof b.levers === "object" && b.levers !== null ? (b.levers as Record<string, unknown>) : {};
-      return json(scoreAccount(v.account, levers));
+      const scored = plan([...ACCOUNTS, { ...v.account, id: "X01" }], levers);
+      return json(scored.ranked.find((s) => s.id === "X01"));
     }
 
     if (pathname.startsWith("/api/")) return json({ error: "not found" }, 404);
