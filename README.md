@@ -78,7 +78,7 @@ public/events.js   event taxonomy, example payloads, metric definitions, validat
 public/app.js      interactive UI (vanilla JS, no framework)
 src/worker.ts      Worker API + static asset serving
 test/              engine, acceptance, event and API tests
-docs/              PRD, five whys, rulebook, event taxonomy, acceptance cases, source ledger, assumptions, demo script
+docs/              PRD, five whys, rulebook, event taxonomy, acceptance cases, source ledger, assumptions, demo script, brand sheet
 ```
 
 ## Docs
@@ -90,7 +90,8 @@ docs/              PRD, five whys, rulebook, event taxonomy, acceptance cases, s
 - [Acceptance cases](docs/ACCEPTANCE_CASES.md): AC-01 to AC-25, each an automated test
 - [Source ledger](docs/SOURCE_LEDGER.md): every external fact, where it's used, and what is explicitly not claimed
 - [Assumptions and open questions](docs/ASSUMPTIONS.md): the synthetic-assumption register and policy choices
-- [Demo script](docs/DEMO_SCRIPT.md): a five-minute walkthrough for a UK GTM leader
+- [Demo script](docs/DEMO_SCRIPT.md): a six-minute walkthrough for a UK GTM leader
+- [Brand sheet and design template](docs/BRAND_SHEET.md): tokens observed on Ramp's public UK pages, kept separate from the adapted tokens this UI uses. No Ramp logo, wordmark or font files are used
 
 ## Notices
 
