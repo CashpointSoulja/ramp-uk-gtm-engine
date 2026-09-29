@@ -1,28 +1,37 @@
 # Assumptions and open questions
 
-## Sourced from Ramp's public pages (checked 29 Sep 2026)
-| Claim used | Source |
-|---|---|
-| Ramp went live in the UK on 15 Sep 2026. Fyxer came back and closed its books four days faster (about 40%) in its first month back | https://ramp.com/blog/uk-launch |
-| Transactions sync to supported accounting systems with VAT and memos included. Receipts can be sent over WhatsApp | https://ramp.com/blog/uk-launch |
-| For UK-headquartered businesses running mainly in GBP. Xero and QuickBooks Online are the strongest integrations. NetSuite, Sage Intacct and Business Central are supported | https://ramp.com/en-gb |
-| Up to 85% of transaction reviews automated. Books closed up to 3x faster. Attio and Multiverse quotes | https://ramp.com/en-gb |
-| ElevenLabs runs bill pay, corporate cards and AI token spend management on Ramp | https://www.prnewswire.com/news-releases/ramp-launches-in-the-uk-302878539.html |
+**Rule of thumb: if a number isn't in [SOURCE_LEDGER.md](SOURCE_LEDGER.md), it's a synthetic assumption or a policy choice, not a measured benchmark.** The same register is in the app (Method tab), in the code (`ASSUMPTIONS` in `public/engine.js`), and served at `GET /api/meta`.
 
-## Assumptions (starting points to test, not benchmarks)
-- **GBP threshold of 50%.** The public wording is "primarily in GBP". The exact cutoff is a policy decision.
-- **Signal weights and half-life (45 days).** These are set by judgement. With real data, fit them to meeting outcomes, for example with logistic regression on signal age.
-- **Play meeting rates (12–40%)** and the **55% meeting-to-opportunity** rate are placeholders to replace with real UK launch data after about 4–6 weeks.
-- **Capacity defaults** (2 SDRs × 5 new accounts a week, 2 AEs × 2 self-sourced accounts, 3 first meetings per AE a week, 2 accountant intros) represent a small, deliberately constrained launch pod so the trade-offs are visible.
-- **Motion thresholds.** 200+ staff or £200k+ a month goes to an AE. Fewer than 30 staff and under £15k a month goes to self-serve.
-- **Pipeline** uses annualised card and bill spend as the basis, not Ramp revenue. Revenue would need take-rate and SaaS pricing assumptions.
+## Synthetic assumptions (illustrative, and to be replaced with measured values)
+| Assumption | Value in the demo | Replace with |
+|---|---|---|
+| Base meeting rate per play | Welcome back 40%, Accountant-led 32%, Renewal switch 24%, First 90 days 22%, AI spend 20%, Post-raise 16%, Displacement 13%, Faster close 12%, Self-serve 0% | Observed first-meeting rate per play × lane ([metric](EVENT_TAXONOMY.md#metrics)) |
+| Timing multiplier on P(meeting) | × (0.55 + 0.9·timing/100), capped at 60% | Calibration gap by play |
+| Meeting → opportunity | 55% | Observed rate by play |
+| Team capacity | 2 SDRs × 5 new accounts/wk, 2 AEs × 2 self-sourced accounts/wk, 3 first meetings per AE/wk, 2 accountant intros/wk, target 5 meetings/wk | The real team's capacity. The defaults describe a hypothetical pod, not any real team |
+| Signal weights | 14–45 points ([RULEBOOK.md](RULEBOOK.md#4-timing-0100-weights-and-half-life-are-synthetic)) | Signal lift |
+| Half-life | 45 days, with web intent at ÷6 | Time to first touch and signal lift by age |
+| Fit weights | Size, accounting and spend 25% each, current tool 15%, entities 10% | Win-rate analysis once deals close |
+| Motion cut-offs | AE at 200+ staff or £200k+/mo; self-serve under 30 staff and £15k/mo | Segment definitions from sales leadership |
+| Tier cut-offs | P1 ≥ 60, P2 ≥ 50, Nurture if timing < 15 | Rep capacity and meeting-rate distribution |
+| Account book | 30 fictional companies with invented signals, legal forms and contact flags | CRM and enrichment |
+
+## Policy choices (explicit decisions, not facts)
+| Choice | Value |
+|---|---|
+| GBP threshold | 50% of spend. Ramp's public wording is "primarily in GBP" |
+| Pipeline basis | Annualised card and bill spend, not revenue |
+| Social DMs follow the email rule | LinkedIn steps are dropped when email isn't permitted |
+| No permitted channel means suppressed | The account doesn't take a rep's slot |
+| Accountant-led steps are the accountant's own contact | Needs partner-agreement and privacy review |
 
 ## Open questions for a real rollout
-1. Is AI token spend management generally available in the UK, or only to design partners?
-2. Which UK accountancy partners exist today, and what is their capacity for joint setups?
-3. How are US Ramp customers with UK entities flagged in CRM, and who owns them: the US account team or UK AEs?
-4. Sage 50 has a large UK SMB base. Is there a supported export route, and how should reps position it?
-5. Where do signals come from in production (CRM, enrichment vendor, web intent, Companies House filings, job boards), and how fresh are they?
+1. Is AI token spend management generally available in the UK?
+2. Which UK accountancy partners exist today, and what joint-setup capacity do they have? How does consent work for accountant-led intros?
+3. How are US Ramp customers with UK entities identified, and who owns them?
+4. Sage 50 has a large UK SMB base. Is there a supported export route?
+5. Where do signals, legal form and CTPS status come from in production (CRM, Companies House, enrichment, the TPS/CTPS screening service), and how fresh are they?
+6. Privacy review: lawful basis and legitimate-interests assessment for B2B processing of named contacts under UK GDPR, plus retention of suppression records.
 
 ## Out of scope for this slice
-CRM sync, real enrichment, user accounts, saved plans and multi-region routing.
+CRM sync, real enrichment, sending messages, user accounts, saved plans, multi-region routing and legal advice.

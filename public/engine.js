@@ -34,13 +34,37 @@ const SUPPORTED_ACCOUNTING = ["Xero", "QuickBooks", "NetSuite", "Sage Intacct", 
 const NATIVE_SYNC = ["Xero", "QuickBooks"];
 const SPEND_TOOLS = ["Pleo", "Soldo", "Spendesk", "Payhawk", "Moss", "Expensify", "Revolut Business"];
 const OPP_RATE = 0.55;
+const P_MEETING_CAP = 0.6;
+const CORPORATE_FORMS = ["Ltd", "PLC", "LLP", "Scottish partnership", "Public body"];
+const INDIVIDUAL_FORMS = ["Sole trader", "Partnership"];
+export const LEGAL_FORMS = [...CORPORATE_FORMS, ...INDIVIDUAL_FORMS];
 
 const SOURCES = {
   launch: { label: "Ramp UK launch post, 15 Sep 2026", url: "https://ramp.com/blog/uk-launch" },
   ukHome: { label: "ramp.com/en-gb", url: "https://ramp.com/en-gb" },
   cards: { label: "Ramp UK corporate cards FAQ", url: "https://ramp.com/en-gb/corporate-cards" },
   press: { label: "Ramp UK launch press release", url: "https://www.prnewswire.com/news-releases/ramp-launches-in-the-uk-302878539.html" },
+  icoEmail: { label: "ICO: electronic mail marketing (PECR)", url: "https://ico.org.uk/for-organisations/direct-marketing-and-privacy-and-electronic-communications/guide-to-pecr/electronic-and-telephone-marketing/electronic-mail-marketing/" },
+  icoCalls: { label: "ICO: telephone marketing (PECR)", url: "https://ico.org.uk/for-organisations/direct-marketing-and-privacy-and-electronic-communications/guide-to-pecr/electronic-and-telephone-marketing/telephone-marketing/" },
+  ctps: { label: "Corporate Telephone Preference Service", url: "https://www.tpsonline.org.uk/ctps/" },
 };
+export { SOURCES };
+
+// Every number the engine uses that is not taken from a public source. None of these are measured benchmarks.
+export const ASSUMPTIONS = [
+  { id: "meeting_rates", value: "12–40% by play (self-serve 0%)", kind: "synthetic", note: "Base P(meeting) per play. Illustrative placeholders; replace with observed first-meeting rates per play after 4–6 weeks of UK outreach." },
+  { id: "timing_multiplier", value: "× (0.55 + 0.9 × timing/100), capped at 60%", kind: "synthetic", note: "How much timing lifts the base meeting rate. A modelling choice, not fitted to data." },
+  { id: "opp_rate", value: `${Math.round(OPP_RATE * 100)}% meeting → opportunity`, kind: "synthetic", note: "Used only for the weighted pipeline figure. Not a Ramp or industry benchmark." },
+  { id: "pipeline_basis", value: "annualised card + bill spend", kind: "policy", note: "Pipeline is shown on a spend basis, not revenue. Revenue would need take-rate and pricing assumptions." },
+  { id: "capacity", value: "2 SDRs × 5 accounts, 2 AEs × 2 self-sourced, 3 first meetings per AE, 2 accountant intros per week", kind: "synthetic", note: "A deliberately small, hypothetical launch pod so the trade-offs are visible. Not a description of any real team." },
+  { id: "signal_weights", value: "14–45 points per signal type", kind: "synthetic", note: "Judgement-based. Fit to meeting outcomes once real data exists." },
+  { id: "half_life", value: "45 days (web intent ÷ 6)", kind: "synthetic", note: "Signal decay. Adjustable in the Capacity view." },
+  { id: "fit_weights", value: "size 25%, accounting 25%, spend 25%, tool 15%, entities 10%", kind: "synthetic", note: "Judgement-based fit model." },
+  { id: "motion_thresholds", value: "AE at 200+ staff or £200k+/mo; self-serve under 30 staff and £15k/mo", kind: "synthetic", note: "Segment cut-offs to test, not policy." },
+  { id: "gbp_threshold", value: "50% of spend in GBP", kind: "policy", note: "Ramp's UK site says 'primarily in GBP'. The exact cut-off is a policy choice." },
+  { id: "tiers", value: "P1 ≥ 60, P2 ≥ 50, nurture if timing < 15", kind: "synthetic", note: "Tier cut-offs." },
+  { id: "accounts", value: "30 fictional UK companies", kind: "synthetic", note: "Every company, signal, legal form and contact flag in the demo book is invented." },
+];
 
 const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
 const round = (n) => Math.round(n);
@@ -67,6 +91,46 @@ export function gates(a) {
     blocks.push(`Only ${round(a.gbpShare * 100)}% of spend is in GBP. Ramp UK is built for businesses that spend mainly in GBP.`);
   return blocks;
 }
+
+// ---------- Contact rules (PECR) ----------
+
+/**
+ * Which outreach channels are permitted for an account, before any play is chosen.
+ * Corporate subscribers (companies, LLPs, Scottish partnerships, public bodies) can be emailed without prior consent,
+ * with an opt-out in every message. Sole traders and other partnerships are individual subscribers: email and social
+ * DMs need specific consent. Numbers on the TPS/CTPS or our do-not-call list are not called. An opt-out suppresses everything.
+ * @param {import("./data.js").Account} a
+ */
+export function contactRules(a) {
+  const c = a.contact ?? {};
+  const form = a.legalForm ?? "Ltd";
+  const subscriber = INDIVIDUAL_FORMS.includes(form) ? "individual" : "corporate";
+  /** @type {string[]} */
+  const reasons = [];
+  if (c.optedOut) {
+    reasons.push(`Opted out of marketing${c.optedOutOn ? ` on ${c.optedOutOn}` : ""}. Suppressed across every lane. Keep them on the suppression list.`);
+    return { subscriber, legalForm: form, suppressed: true, email: false, social: false, phone: false, reasons };
+  }
+  const email = subscriber === "corporate" || c.emailConsent === true;
+  if (!email) reasons.push(`${form}: an individual subscriber under PECR, so marketing email and social DMs need specific consent. None is recorded.`);
+  else if (subscriber === "individual") reasons.push(`${form} with recorded email consent. Email is allowed.`);
+  const phone = !c.ctps && !c.doNotCall;
+  if (c.ctps) reasons.push("Number is registered on the CTPS/TPS. No unsolicited marketing calls.");
+  if (c.doNotCall) reasons.push("On our do-not-call list. No marketing calls.");
+  return { subscriber, legalForm: form, suppressed: false, email, social: email, phone, reasons };
+}
+
+const CHANNEL_RULE = { Email: "email", LinkedIn: "social", Call: "phone" };
+
+/** @param {{channel: string}[]} steps @param {ReturnType<typeof contactRules>} rules */
+export function permittedSteps(steps, rules) {
+  return steps.filter((st) => {
+    const key = CHANNEL_RULE[st.channel];
+    return !key || rules[key];
+  });
+}
+
+export const OPT_OUT_LINE = "Not relevant? Reply \"unsubscribe\" and we won't contact you again.";
 
 // ---------- Fit ----------
 
@@ -269,7 +333,7 @@ export function draft(a, playId, why) {
     self_serve: [`Subject: GBP cards for ${a.name}, set up in minutes`, "Get cards issued with limits already set, and let the team send receipts over WhatsApp.", `${sync}. You can sign up at ramp.com/en-gb.`],
   };
   const body = lines[playId] ?? [`Subject: ${a.name} and Ramp UK`, hook];
-  return `${body[0]}\n\n[First name],\n\n${body.slice(1).join("\n\n")}\n\n[Rep name]`;
+  return `${body[0]}\n\n[First name],\n\n${body.slice(1).join("\n\n")}\n\n[Rep name]\n\n${OPT_OUT_LINE}`;
 }
 
 export function sequence(playId, lane) {
@@ -280,8 +344,8 @@ export function sequence(playId, lane) {
   ];
   if (lane === "partner") return [
     { day: 0, channel: "Partner", step: "Brief the accountant and agree a joint intro" },
-    { day: 2, channel: "Email", step: "Accountant sends the three-way intro" },
-    { day: 7, channel: "Call", step: "30-minute setup call with the accountant" },
+    { day: 2, channel: "Accountant", step: "Accountant sends the three-way intro to their own client" },
+    { day: 7, channel: "Meeting", step: "30-minute setup call with the accountant, once the client accepts" },
   ];
   const opener = playId === "welcome_back" ? "Warm intro through their US Ramp contact" : "Personalised email (draft below)";
   return [
@@ -301,18 +365,27 @@ export function sequence(playId, lane) {
 export function scoreAccount(a, leversIn = {}) {
   const lv = normaliseLevers(leversIn);
   const blocks = gates(a);
+  const rules = contactRules(a);
   const f = fit(a);
   const t = timing(a, lv.halfLifeDays);
   const priority = round(lv.fitWeight * f.score + (1 - lv.fitWeight) * t.score);
   const play = choosePlay(a, lv.disabledPlays);
-  const playId = blocks.length ? null : play.primary;
-  const mv = playId ? motion(a, playId) : { lane: "hold", label: "Hold", owner: "None" };
+  const candidate = blocks.length || rules.suppressed ? null : play.primary;
+  const candidateMotion = candidate ? motion(a, candidate) : null;
+  const steps = candidate && candidateMotion ? permittedSteps(sequence(candidate, candidateMotion.lane), rules) : [];
+  const touches = steps.filter((st) => st.channel !== "In-product");
+  const noChannel = Boolean(candidate) && touches.length === 0;
+  const suppressed = !blocks.length && (rules.suppressed || noChannel);
+  const suppression = rules.suppressed ? rules.reasons[0] : noChannel ? `No permitted channel for the ${candidateMotion?.label ?? ""} motion. ${rules.reasons.join(" ")}` : null;
+  const playId = suppressed ? null : candidate;
+  const mv = playId && candidateMotion ? candidateMotion : { lane: "hold", label: "Hold", owner: "None" };
   let tier = priority >= 60 ? "P1" : priority >= 50 ? "P2" : "P3";
   if (t.score < 15 && playId !== "self_serve") tier = "Nurture";
+  if (!playId) tier = "Nurture";
+  if (suppressed) tier = "Suppressed";
   if (blocks.length) tier = "Blocked";
-  if (!playId && !blocks.length) tier = "Nurture";
   const meta = playId ? PLAYS[playId] : null;
-  const pMeeting = meta ? clamp(meta.meetingRate * (0.55 + (0.9 * t.score) / 100), 0, 0.6) : 0;
+  const pMeeting = meta ? clamp(meta.meetingRate * (0.55 + (0.9 * t.score) / 100), 0, P_MEETING_CAP) : 0;
   return {
     id: a.id,
     account: a,
@@ -321,6 +394,7 @@ export function scoreAccount(a, leversIn = {}) {
     fit: f,
     timing: t,
     gates: blocks,
+    contact: { ...rules, suppression },
     play: playId,
     playName: meta ? meta.name : null,
     alternates: play.alternates.filter((p) => p !== playId),
@@ -329,8 +403,9 @@ export function scoreAccount(a, leversIn = {}) {
     whyNow: t.contributions.filter((c) => c.points >= 1),
     proof: meta ? meta.proof : null,
     persona: meta ? meta.persona : null,
-    sequence: playId ? sequence(playId, mv.lane) : [],
-    draft: playId ? draft(a, playId, t.contributions) : null,
+    sequence: playId ? steps : [],
+    draft: playId && rules.email ? draft(a, playId, t.contributions) : null,
+    draftNote: playId && !rules.email ? "Email isn't permitted for this account, so there is no email draft. Use the permitted steps in the sequence." : null,
   };
 }
 
@@ -363,7 +438,7 @@ export function plan(accounts, leversIn = {}) {
   const headcount = { sdr: lv.sdrs, ae: lv.aes, partner: 1 };
 
   for (const s of scored) {
-    if (s.tier === "Blocked" || s.tier === "Nurture") continue;
+    if (s.tier === "Blocked" || s.tier === "Nurture" || s.tier === "Suppressed") continue;
     const lane = s.motion.lane;
     if (lane === "digital") {
       weeks[0].used.digital++;
@@ -402,10 +477,11 @@ export function plan(accounts, leversIn = {}) {
         ? "Pipeline volume: the target needs more accounts or stronger signals"
         : "None";
 
+  /** @type {Record<string, number>} */
   const playMix = {};
   for (const s of scored) if (s.play) playMix[s.play] = (playMix[s.play] ?? 0) + 1;
 
-  const tiers = { P1: 0, P2: 0, P3: 0, Nurture: 0, Blocked: 0 };
+  const tiers = { P1: 0, P2: 0, P3: 0, Nurture: 0, Suppressed: 0, Blocked: 0 };
   for (const s of scored) tiers[s.tier]++;
 
   return {
@@ -422,7 +498,7 @@ export function plan(accounts, leversIn = {}) {
       expectedMeetings: Math.round(weeks.reduce((n, w) => n + w.expectedMeetings, 0) * 10) / 10,
       pipelineGBP: weeks.reduce((n, w) => n + w.pipelineGBP, 0),
     },
-    assumptions: { oppRate: OPP_RATE, pipelineBasis: "Estimated annual card and bill spend that could move to Ramp, weighted by P(meeting) × P(opportunity). This is not revenue." },
+    assumptions: { synthetic: true, oppRate: OPP_RATE, pipelineBasis: "Estimated annual card and bill spend that could move to Ramp, weighted by P(meeting) × P(opportunity). This is not revenue." },
   };
 }
 
@@ -445,6 +521,20 @@ export function validateAccount(raw) {
   if (!accounting) errs.push(`accounting must be one of ${ACCOUNTING.join(", ")}`);
   const entities = raw.entities === undefined ? 1 : Number(raw.entities);
   if (!Number.isInteger(entities) || entities < 1 || entities > 200) errs.push("entities must be a whole number from 1 to 200");
+  const legalForm = raw.legalForm === undefined ? "Ltd" : LEGAL_FORMS.includes(raw.legalForm) ? raw.legalForm : null;
+  if (!legalForm) errs.push(`legalForm must be one of ${LEGAL_FORMS.join(", ")}`);
+  const rc = raw.contact === undefined ? {} : raw.contact;
+  if (typeof rc !== "object" || rc === null || Array.isArray(rc)) errs.push("contact must be an object");
+  /** @type {import("./data.js").Contact} */
+  const contact = {};
+  if (typeof rc === "object" && rc !== null) {
+    for (const k of ["optedOut", "emailConsent", "ctps", "doNotCall"]) {
+      if (rc[k] === undefined) continue;
+      if (typeof rc[k] !== "boolean") errs.push(`contact.${k} must be true or false`);
+      else contact[k] = rc[k];
+    }
+    if (typeof rc.optedOutOn === "string" && /^\d{4}-\d{2}-\d{2}$/.test(rc.optedOutOn)) contact.optedOutOn = rc.optedOutOn;
+  }
   const signals = Array.isArray(raw.signals) ? raw.signals : [];
   if (signals.length > 12) errs.push("at most 12 signals");
   const clean = [];
@@ -466,6 +556,7 @@ export function validateAccount(raw) {
       sector: typeof raw.sector === "string" ? raw.sector.slice(0, 60) : "Unspecified",
       employees,
       stage: typeof raw.stage === "string" ? raw.stage.slice(0, 40) : "Unknown",
+      legalForm: /** @type {string} */ (legalForm),
       ukEntity: raw.ukEntity !== false,
       gbpShare,
       entities,
@@ -473,6 +564,7 @@ export function validateAccount(raw) {
       accounting,
       monthlySpendGBP: spend,
       aiNative: raw.aiNative === true,
+      contact,
       signals: clean,
     },
   };

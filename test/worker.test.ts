@@ -52,4 +52,26 @@ describe("worker API", () => {
     expect((await call("/api/nope")).status).toBe(404);
     expect(await (await call("/")).text()).toBe("asset");
   });
+
+  it("serves the event taxonomy with examples and metrics", async () => {
+    const r = await call("/api/events");
+    expect(r.status).toBe(200);
+    const b = (await r.json()) as { events: object; examples: unknown[]; metrics: unknown[] };
+    expect(Object.keys(b.events)).toContain("opt_out_recorded");
+    expect(b.examples.length).toBe(Object.keys(b.events).length);
+    expect(b.metrics.length).toBeGreaterThan(0);
+  });
+
+  it("exposes the assumption register in meta", async () => {
+    const b = (await (await call("/api/meta")).json()) as { assumptions: { kind: string }[]; legalForms: string[] };
+    expect(b.assumptions.every((a) => a.kind === "synthetic" || a.kind === "policy")).toBe(true);
+    expect(b.legalForms).toContain("Sole trader");
+  });
+
+  it("applies contact rules to scored accounts and rejects bad contact flags", async () => {
+    const ok = await post("/api/score", { account: { name: "Optout Ltd", employees: 100, monthlySpendGBP: 50000, gbpShare: 1, accounting: "Xero", contact: { optedOut: true }, signals: [{ type: "funding_round", daysAgo: 2 }] } });
+    expect(((await ok.json()) as { tier: string }).tier).toBe("Suppressed");
+    const bad = await post("/api/score", { account: { name: "X", employees: 10, monthlySpendGBP: 1000, gbpShare: 1, accounting: "Xero", contact: { ctps: "no" } } });
+    expect(bad.status).toBe(400);
+  });
 });

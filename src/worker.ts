@@ -1,5 +1,6 @@
 import { ACCOUNTS, AS_OF, SIGNAL_TYPES } from "../public/data.js";
-import { DEFAULT_LEVERS, PLAYS, plan, scoreAccount, validateAccount } from "../public/engine.js";
+import { ASSUMPTIONS, DEFAULT_LEVERS, LEGAL_FORMS, PLAYS, SOURCES, plan, scoreAccount, validateAccount } from "../public/engine.js";
+import { EVENTS, EVENT_EXAMPLES, METRICS } from "../public/events.js";
 
 interface Env {
   ASSETS: Fetcher;
@@ -36,7 +37,18 @@ export default {
     if (pathname === "/api/health") return json({ ok: true, engine: "deterministic", accounts: ACCOUNTS.length, asOf: AS_OF });
 
     if (pathname === "/api/meta" && request.method === "GET")
-      return json({ asOf: AS_OF, accounts: ACCOUNTS, signalTypes: SIGNAL_TYPES, plays: playCatalogue(), defaultLevers: DEFAULT_LEVERS });
+      return json({
+        asOf: AS_OF,
+        accounts: ACCOUNTS,
+        signalTypes: SIGNAL_TYPES,
+        plays: playCatalogue(),
+        defaultLevers: DEFAULT_LEVERS,
+        legalForms: LEGAL_FORMS,
+        assumptions: ASSUMPTIONS,
+        sources: SOURCES,
+      });
+
+    if (pathname === "/api/events" && request.method === "GET") return json({ events: EVENTS, examples: EVENT_EXAMPLES, metrics: METRICS });
 
     if (pathname === "/api/plan" && request.method === "POST") {
       const b = await readBody(request);

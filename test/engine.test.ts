@@ -192,7 +192,7 @@ describe("capacity plan", () => {
 
   it("assigns every actionable account a week or lists it as overflow", () => {
     const p = plan(ACCOUNTS, { sdrs: 1, aes: 1, weeks: 1 });
-    const actionable = p.ranked.filter((s) => s.tier !== "Blocked" && s.tier !== "Nurture");
+    const actionable = p.ranked.filter((s) => !["Blocked", "Nurture", "Suppressed"].includes(s.tier));
     const assigned = actionable.filter((s) => s.assignment?.week);
     const overflow = actionable.filter((s) => s.assignment?.owner === "Overflow");
     expect(assigned.length + overflow.length).toBe(actionable.length);
