@@ -1,0 +1,21 @@
+{
+  "name": "ramp-uk-gtm-engine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ramp UK GTM Engine: an independent concept by Ayo Ahmed (not affiliated with Ramp). Turns UK account signals into a ranked, capacity-planned weekly outbound plan.",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check": "tsc --noEmit && vitest run"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260927.1",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.2",
+    "wrangler": "^4.142.0"
+  }
+}

@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ramp UK GTM Engine: independent concept</title>
+  <meta name="description" content="An independent concept by Ayo Ahmed. It turns UK account signals into a ranked, capacity-planned weekly outbound plan. Not affiliated with Ramp. All account data is synthetic." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%2316150f'/><path d='M8 22 L16 10 L24 22' stroke='%23e3f04a' stroke-width='3.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <span class="mark" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M8 22 L16 10 L24 22" /></svg></span>
+      <div>
+        <div class="title">Ramp UK <span>GTM Engine</span></div>
+        <div class="sub">Independent concept by Ayo Ahmed · not affiliated with Ramp · synthetic accounts</div>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Views">
+      <button role="tab" data-tab="queue" aria-selected="true">Queue</button>
+      <button role="tab" data-tab="capacity" aria-selected="false">Capacity</button>
+      <button role="tab" data-tab="plays" aria-selected="false">Plays</button>
+      <button role="tab" data-tab="method" aria-selected="false">Method</button>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <div class="hero-copy">
+      <p class="eyebrow">Launch plan · as of <span id="asof">29 Sep 2026</span> · two weeks after Ramp went live in the UK</p>
+      <h1>Which UK accounts to work this week, with which play, and whether the team can handle it.</h1>
+    </div>
+    <div class="kpis" id="kpis" aria-live="polite"></div>
+  </section>
+
+  <main>
+    <section class="view" id="view-queue" role="tabpanel">
+      <div class="queue-layout">
+        <aside class="list-pane">
+          <div class="filters">
+            <input id="q" type="search" placeholder="Search accounts, cities, sectors" aria-label="Search accounts" />
+            <div class="chips" id="tier-chips" role="group" aria-label="Filter by tier"></div>
+          </div>
+          <ol class="acct-list" id="acct-list"></ol>
+          <button class="ghost wide" id="add-toggle" aria-expanded="false">+ Score a new account</button>
+          <form id="add-form" class="add-form" hidden>
+            <label>Company<input name="name" required maxlength="80" placeholder="e.g. Harbourline Studios" /></label>
+            <div class="row2">
+              <label>Employees<input name="employees" type="number" min="1" max="100000" value="120" required /></label>
+              <label>Monthly spend (£)<input name="monthlySpendGBP" type="number" min="0" step="1000" value="60000" required /></label>
+            </div>
+            <div class="row2">
+              <label>Accounting<select name="accounting"><option>Xero</option><option>QuickBooks</option><option>NetSuite</option><option>Sage Intacct</option><option>Business Central</option><option>Sage 50</option><option>Other ERP</option></select></label>
+              <label>Current tool<select name="incumbent"><option>Spreadsheets</option><option>Amex + reimbursements</option><option>Pleo</option><option>Soldo</option><option>Spendesk</option><option>Payhawk</option><option>Moss</option><option>Expensify</option><option>Revolut Business</option></select></label>
+            </div>
+            <div class="row2">
+              <label>GBP share of spend<input name="gbpShare" type="number" min="0" max="1" step="0.05" value="0.9" required /></label>
+              <label>Entities<input name="entities" type="number" min="1" max="200" value="1" required /></label>
+            </div>
+            <label>Strongest signal<select name="signal" id="add-signal"></select></label>
+            <label>Signal age / days until renewal<input name="signalDays" type="number" min="0" max="730" value="10" /></label>
+            <label class="check"><input type="checkbox" name="aiNative" /> AI-native company</label>
+            <label class="check"><input type="checkbox" name="ukEntity" checked /> UK-registered entity</label>
+            <button type="submit" class="primary">Score and add to queue</button>
+            <p class="form-err" id="add-err" role="alert"></p>
+          </form>
+        </aside>
+        <article class="detail-pane" id="detail" aria-live="polite"></article>
+      </div>
+    </section>
+
+    <section class="view" id="view-capacity" role="tabpanel" hidden>
+      <div class="cap-layout">
+        <form class="levers" id="levers" aria-label="Plan levers"></form>
+        <div class="cap-out" id="cap-out"></div>
+      </div>
+    </section>
+
+    <section class="view" id="view-plays" role="tabpanel" hidden>
+      <p class="lede">Nine plays, checked in order. Each account gets the first play it strongly matches. Turn a play off and its accounts move to their next-best play, and the whole plan updates.</p>
+      <div class="plays" id="plays"></div>
+    </section>
+
+    <section class="view" id="view-method" role="tabpanel" hidden>
+      <div class="method" id="method"></div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <footer class="foot">
+    <p><strong>Independent concept by Ayo Ahmed.</strong> Not affiliated with, endorsed by or built with data from Ramp. “Ramp” is used only to describe the product this plan is for. Every company, signal and number in the queue is synthetic. Product facts and customer quotes come from Ramp's public UK pages, linked on each play.</p>
+    <p><a href="https://github.com/CashpointSoulja/ramp-uk-gtm-engine">Source on GitHub</a> · <a href="/api/health">API health</a></p>
+  </footer>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
