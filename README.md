@@ -91,8 +91,8 @@ docs/              PRD, five whys, rulebook, event taxonomy, acceptance cases, s
 - [Source ledger](docs/SOURCE_LEDGER.md): every external fact, where it's used, and what is explicitly not claimed
 - [Assumptions and open questions](docs/ASSUMPTIONS.md): the synthetic-assumption register and policy choices
 - [Demo script](docs/DEMO_SCRIPT.md): a six-minute walkthrough for a UK GTM leader
-- [Brand sheet and design template](docs/BRAND_SHEET.md): tokens observed on Ramp's public UK pages, kept separate from the adapted tokens this UI uses. No Ramp logo, wordmark or font files are used
+- [Brand sheet and design template](docs/BRAND_SHEET.md): tokens and component patterns observed on ramp.com/en-gb and the UK launch post, kept separate from the adapted tokens this UI uses. The UI shows the Ramp mark at Ayo's direction, with an independent-concept notice beside it. It uses no Ramp wordmark or font files
 
 ## Notices
 
-"Ramp" and customer names are the property of their owners and are used only to describe the market this concept targets. Customer quotes are reproduced from Ramp's public pages and linked at the point of use. All companies in the account universe are fictional. The contact rules are a simplified reading of ICO guidance for demonstration, not legal advice.
+"Ramp", the Ramp mark and customer names are the property of their owners and are used only to describe the market this concept targets. Customer quotes are reproduced from Ramp's public pages and linked at the point of use. All companies in the account universe are fictional. The contact rules are a simplified reading of ICO guidance for demonstration, not legal advice.

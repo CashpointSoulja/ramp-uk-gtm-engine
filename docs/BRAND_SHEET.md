@@ -5,7 +5,7 @@ This sheet sets the look of the GTM Engine UI. It has two parts, kept separate o
 1. **Observed tokens.** What Ramp's public UK pages use, measured from the live pages. This is a record of what the pages use. It is not a Ramp brand guideline, and Ramp didn't supply or approve it.
 2. **Adapted product tokens.** What this concept uses, and why each value differs where it does. `public/style.css` implements these as CSS custom properties.
 
-**Independent concept.** This UI is independent work by Ayo Ahmed and isn't affiliated with, endorsed by or produced for Ramp. It borrows the *feel* of a public page (white space, neutral type, one bright accent). It doesn't use Ramp's logo, wordmark, icons, illustrations, product screenshots or proprietary font files. The header, footer and README keep the independent-concept, synthetic-data and non-affiliation notices.
+**Independent concept.** This UI is independent work by Ayo Ahmed and isn't affiliated with, endorsed by or produced for Ramp. At Ayo's direction it mirrors the public ramp.com/en-gb site closely (nav, hero, spacing, accents, shapes and component patterns) and shows the Ramp mark, so a UK GTM leader sees it in a familiar context. The Ramp name and mark belong to Ramp. The UI never presents the tool as an official Ramp product: a notice bar above the header, the header subtitle, the footer and the README all say it is an independent concept, not affiliated with or endorsed by Ramp, and that every account is synthetic. It doesn't use the Ramp wordmark (the lowercase "ramp" lettering), Ramp illustrations, product screenshots or proprietary font files.
 
 ## Method
 
@@ -18,6 +18,13 @@ This sheet sets the look of the GTM Engine UI. It has two parts, kept separate o
 | Limits | This is one snapshot of two pages. Ramp's site can change. Nothing here comes from internal Ramp material. Measured values are exact for that date. The descriptive notes are judgement. |
 
 ## 1. Observed tokens
+
+### Logo (observed)
+
+| | |
+|---|---|
+| Lockup | The header shows the "ramp" wordmark with the mark to its right, as one inline SVG (`viewBox 0 0 71 20`) filled with `currentColor`. It is near-black on white, and white on dark bands |
+| Mark | A curved swoosh over a short flat base, drawn as one path in the same SVG. Ayo's reference image (225 × 225px) shows the mark in black on a lime square |
 
 ### Colour
 
@@ -64,7 +71,13 @@ Every heading was regular weight (400). Hierarchy comes from size alone, not wei
 | Shadows | Essentially none | Only one transparent shadow was found on each page. Surfaces are separated by tone and hairlines, not elevation |
 | Content width | about 1297px inner container at 1440 (72px gutters). 358px at 390 (16px gutters) | |
 | White space | Broad: the hero sits in a mostly empty white field, and sections are separated by large vertical gaps | |
-| Header | White, nav 14px, 6px-radius targets, lime and dark CTAs at the right | Mobile: wordmark plus a 40px, 6px-radius menu button |
+| Geo notice bar | `#1a1919` band above the header, 14 / 20px white text, centred | Wraps to two lines on mobile |
+| Header | White, fixed. Wordmark lockup ("ramp" + mark, 75 × 20px inline SVG, `currentColor`) on the left, then Products, Resources, Customers and Pricing as 14px nav items, 44px tall, 0 12px padding and 6px radius, with a hover fill of `rgba(33,33,33,0.05)`. On the right: "Sign in" as 16px text, lime "See a demo" and dark "Get started", both 34px tall with 12px 16px padding | Mobile: wordmark plus a 40px, 6px-radius menu button with a `rgba(33,33,33,0.05)` fill |
+| Hero | Centred. Grey eyebrow ("Ramp is live in the UK"), 64px headline, 20px grey subhead, then a 500px email-capture field with a lime button inside | Mobile: 40px headline, the field and a full-width 42px lime button stacked |
+| Product frame | Directly under the hero: a full-width `#f4f2f0` panel with 16px radius and 24px side margins, holding the product mock | Mobile: 16px margins |
+| Section heads | Centred 40 / 42px headline with grey body copy under it | 28 / 32px |
+| Stat band | A near-black band with dark stat tiles, 60%-white labels and large regular-weight white numbers | Tiles stack |
+| Footer | Near-black, with white and 60%-white text | |
 
 ### Observed voice (for reference only)
 
@@ -97,7 +110,9 @@ The engine is a dense, data-heavy working tool, not a landing page, so some valu
 |---|---|---|---|
 | Family | `"Inter", Arial, sans-serif` | `Lausanne, Arial, sans-serif` | Lausanne is proprietary and not licensed for this concept. Inter is a neutral grotesque under the SIL Open Font License 1.1. It is self-hosted at `public/fonts/` as one 48 KB variable Latin file, and its licence is in `public/fonts/OFL.txt`. Arial, the observed fallback, is kept as the next fallback |
 | Headings | Weight 400 | 400 | Same. Hierarchy comes from size |
-| Page headline (`.hero h1`) | 40 / 42px desktop, 28 / 32px mobile | Home hero 64px, blog 40px | This is a working screen under a sticky header, so it uses the blog headline scale. The 64px hero would push the queue below the fold |
+| Page headline (`.hero h1`) | 64 / 64px desktop, 40 / 42px mobile | Home hero 64 / 64px, 40 / 42px mobile | Same. The headline is shortened to one line so the frame starts high on the page |
+| View heading (`.vhead h2`) | 40 / 42px desktop, 28 / 32px mobile, centred | Section `h2` 40 / 42px, 28 / 32px | Same |
+| Hero subhead | 20 / 26px, 18 / 22px mobile, `--ink2` | 20 / 26px, 18 / 22px | Same |
 | Account name (`.dhead h2`) | 28 / 32px | Blog section heading 28 / 32px | Same scale |
 | Card heading (`.card h3`) | 20 / 26px | `h3` 20 / 26px | Same |
 | Big numbers (KPIs, priority) | 28–40px, 400, tabular figures | none | Numbers stay regular weight, in the observed style, and use tabular figures so columns line up |
@@ -113,8 +128,17 @@ The engine is a dense, data-heavy working tool, not a landing page, so some valu
 | `--r` (cards) | 12px | 12px | Same |
 | Pills (tiers, chips) | 999px | 999px (mobile) | Same |
 | Shadow | none | none | Tone and hairlines only |
-| Gutters | 28px desktop, 16px ≤900px | 72px and 16px | Tighter on desktop to fit the two-pane queue. The same 16px on mobile |
-| Max width | 1440px | about 1297px inner | Kept wider for the data panes |
+| Header gutters | 72px desktop, 24px at ≤1240px, 16px at ≤900px | 72px and 16px | Same, with a middle step so the nav fits on laptops |
+| Frame | `#f4f2f0`, 16px radius, 24px margins and 24px padding. 16px margins and 12px padding on mobile | Product frame | The working views sit inside the frame where Ramp shows its product mock |
+| Max width | 1392px frame, 1440px header | about 1297px inner | Kept wider for the data panes |
+
+### Logo (adapted)
+
+| | |
+|---|---|
+| Asset | Only the mark path, taken from the header SVG on ramp.com/en-gb so it stays sharp at every size. The wordmark path isn't used |
+| Treatment | `--ink` mark on an `--accent` tile with 6px radius, following Ayo's reference. 32px in the header and favicon, and 32px on the dark footer. The header tile carries `aria-label="Ramp mark"` |
+| Why | Ayo asked for the UI to look at home on ramp.com/en-gb and to show the Ramp mark. The notices around it keep the tool from reading as an official Ramp product |
 
 ## 3. Component templates
 
@@ -123,14 +147,19 @@ The engine is a dense, data-heavy working tool, not a landing page, so some valu
 | Primary CTA (`.primary`) | Lime fill, `--ink` label, 6px radius, 10px 16px padding, weight 500. Hover darkens the lime slightly. One per region, used only for the main action ("Score and add to queue", "Log") |
 | Secondary button (`.ghost`) | White, 1px `--control` border, 6px radius. Used for "Copy", "Record opt-out" and "Score a new account" |
 | Dark button / selected tab | `--dark` fill with white text and 6px radius, matching the dark CTA |
-| Header | White with a bottom hairline, sticky. The title is plain text, "Ramp UK GTM Engine" in title case. The mark is a neutral three-bar "ranked queue" glyph in lime on ink, which is not a Ramp mark. The independence line sits under the title |
-| KPI tile | `--surface` fill, no border, no shadow, 12px radius. Label 13px `--ink2`, value 28–32px at 400 |
+| Notice bar (`.notice`) | `--dark` band above the header, in the position of Ramp's geo notice: "Independent concept by Ayo Ahmed. Not an official Ramp product, and not affiliated with or endorsed by Ramp. All account data is synthetic." |
+| Header (`.top`) | White, sticky, with a hairline. On the left, the Ramp mark (black on a lime 32px tile with 6px radius, matching the reference Ayo supplied) and "Ramp UK GTM Engine" in plain text, not the wordmark. The independence line sits under the title on wide screens. The four views are nav items in Ramp's style: 14px, 44px tall, 6px radius, hover fill, and the selected view gets a fill and a 2px underline. On the right: "API" as a text link, lime "Score an account" (opens the add-account form) and dark "View source" (GitHub). On mobile the views become a full-width row of four and only the lime button stays |
+| Hero (`.hero`) | Centred grey eyebrow (the as-of date), a 64px headline, a 20px subhead, then a finder built like Ramp's email capture. Submitting it filters the queue and scrolls to it |
+| Frame (`.frame`) | The warm-grey panel that holds the KPI band and every view |
+| View head (`.vhead`) | Centred 40px heading and grey lede at the top of Queue, Capacity, Plays and Method |
+| KPI band | Ramp's dark stat band: an `--ink` band holding `--dark` tiles, labels in 64% white, 40px regular white numbers and a lime progress bar. The bottleneck tile gets a lime border when there is a bottleneck |
 | Card | White, 1px `--line`, 12px radius, no shadow |
 | Queue row | A white card row. Selected rows get a 1px `--ink` ring. The tier pill is on the right |
 | Tier pills | P1 ink with lime text. P2 lime with ink text. P3 surface grey. Nurture, Suppressed, Duplicate and Blocked use pale tints with dark text (≥4.5:1) |
 | Inputs | White, 1px `--control`, 6px radius, 40px tall. The focus ring is 2px `--ink` with a 2px offset |
 | Callouts (pass, check, block) | A pale tint with dark tinted text and a 1px tinted border, 12px radius |
 | Toast and code | `--dark` fill with white text, echoing the observed dark bands |
+| Footer (`.foot`) | A near-black band with the mark, the full independence and synthetic-data disclaimer, a trademark line ("Ramp, the Ramp name and the Ramp mark belong to Ramp…") and links |
 
 ## 4. Rules
 
@@ -138,18 +167,20 @@ The engine is a dense, data-heavy working tool, not a landing page, so some valu
 - Keep broad white space: a white page, one warm-grey surface and hairlines.
 - Use regular-weight headings, and build hierarchy through size.
 - Use lime sparingly: primary actions, P1/P2 emphasis and meter fills. Always put ink text on lime.
-- Keep every notice visible: "Independent concept by Ayo Ahmed · not affiliated with Ramp · synthetic accounts" in the header, and the full footer disclaimer.
+- Keep every notice visible: the notice bar, the header line "Independent concept by Ayo Ahmed · not affiliated with Ramp · synthetic accounts" (on wide screens), and the full footer disclaimer and trademark line.
+- Always show the mark with "GTM Engine" and the independence notice, never on its own as if it were Ramp's product.
 - Keep focus rings visible, and hit targets at least 34px (40px on mobile inputs).
 
 **Don't:**
-- Use Ramp's logo, wordmark, lowercase "ramp" lettering, favicon, icons, illustrations or screenshots.
+- Use the Ramp wordmark (lowercase "ramp" lettering), Ramp illustrations, product screenshots or Ramp's own favicon file.
 - Load, copy or embed Lausanne or any other Ramp font file.
-- Present the UI as official Ramp work, or reuse Ramp slogans as headlines.
+- Present the UI as official Ramp work, or reuse Ramp slogans as headlines. Don't label a CTA "Get started" or "See a demo", since this tool doesn't sign anyone up to Ramp.
 - Put lime text on white, or use `--line` as the only boundary of an input.
 
 ## 5. Accessibility checks for the re-skin
 
 - Contrast was computed with the WCAG relative-luminance formula. Every text and background pair used meets 4.5:1, and non-text control boundaries meet 3:1. The values are in the tables above.
-- Controls, tab roles, `aria-selected`, `aria-live` regions, labels and keyboard focus are unchanged from the previous UI.
+- Controls, tab roles, `aria-selected`, `aria-live` regions, labels and keyboard focus are unchanged from the previous UI. The two new controls, the hero finder and the "Score an account" button, are a labelled search form and a native button. They only drive existing views and send nothing.
+- Focus rings switch to white on the dark KPI band and in the footer.
 - `prefers-reduced-motion` still disables transitions.
 - At 390px there is no horizontal overflow, and every control stays reachable.
