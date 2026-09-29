@@ -13,12 +13,23 @@ describe("brand guardrails", () => {
     expect(html).toMatch(/Every company, signal and number in the queue is synthetic/);
   });
 
-  it("uses no Ramp logo, wordmark image or proprietary font", () => {
+  it("shows the Ramp mark only beside an independence notice, with no wordmark or proprietary font", () => {
+    expect(html).toContain('aria-label="Ramp mark"');
+    expect(html).toContain("Not an official Ramp product, and not affiliated with or endorsed by Ramp.");
+    expect(html).toContain("Ramp, the Ramp name and the Ramp mark belong to Ramp.");
+    expect(html.indexOf('class="notice"')).toBeLessThan(html.indexOf('class="top"'));
+    expect(html).not.toMatch(/M5\.098 6\.736/);
     expect(html).not.toMatch(/<img[^>]*ramp/i);
     expect(css).not.toMatch(/lausanne/i);
     expect(html).not.toMatch(/lausanne/i);
     expect(css).toMatch(/font-family: "Inter", Arial, sans-serif/);
     expect(css).toContain('url("/fonts/inter-latin-wght-normal.woff2")');
+  });
+
+  it("uses the observed hero and section scale", () => {
+    expect(css).toMatch(/\.hero h1 \{ font-size: 64px; line-height: 64px;/);
+    expect(css).toMatch(/\.hero h1 \{ font-size: 40px; line-height: 42px;/);
+    expect(css).toMatch(/\.vhead h2 \{ font-size: 40px; line-height: 42px;/);
   });
 
   it("implements the adapted tokens from the brand sheet", () => {

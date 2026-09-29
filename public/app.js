@@ -388,6 +388,15 @@ document.addEventListener("click", (e) => {
     toast(`${before.account.name} suppressed. Removed from ${before.assignment?.week ? `week ${before.assignment.week}` : "the queue"} and every lane.`);
     return;
   }
+  if (el.id === "cta-score") {
+    if (state.tab !== "queue") setTab("queue");
+    const f = $("#add-form");
+    f.hidden = false;
+    $("#add-toggle").setAttribute("aria-expanded", "true");
+    f.scrollIntoView({ behavior: "smooth", block: "center" });
+    f.querySelector("input")?.focus({ preventScroll: true });
+    return;
+  }
   if (el.id === "add-toggle") {
     const f = $("#add-form");
     f.hidden = !f.hidden;
@@ -396,6 +405,16 @@ document.addEventListener("click", (e) => {
 });
 
 $("#q").addEventListener("input", (e) => { state.q = e.target.value; renderList(); });
+
+$("#hero-find").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const q = $("#hero-q").value.trim();
+  $("#q").value = q;
+  state.q = q;
+  if (state.tab !== "queue") setTab("queue");
+  else renderList();
+  $("#frame").scrollIntoView({ behavior: "smooth", block: "start" });
+});
 
 $("#levers").addEventListener("input", (e) => {
   const t = e.target;
